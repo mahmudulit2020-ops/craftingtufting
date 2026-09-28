@@ -1,0 +1,8 @@
+{
+  "name": "Crafting & Tufting",
+  "description": "Handcrafted rugs designed your way. Choose from our jute and tufted collections or create a custom rug measured precisely for your space.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
