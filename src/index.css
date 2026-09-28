@@ -1,0 +1,161 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    background-color: #FBFAF6;
+    color: #242421;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: Arial, Helvetica, sans-serif;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 bg-charcoal-800 text-cream px-7 py-3.5 text-sm font-medium tracking-[0.15em] uppercase transition-all duration-300 hover:bg-charcoal-900 active:scale-[0.98];
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 border border-charcoal-700 text-charcoal-800 px-7 py-3.5 text-sm font-medium tracking-[0.15em] uppercase transition-all duration-300 hover:bg-charcoal-800 hover:text-cream active:scale-[0.98];
+  }
+  .btn-accent {
+    @apply inline-flex items-center justify-center gap-2 bg-accent text-cream px-7 py-3.5 text-sm font-medium tracking-[0.15em] uppercase transition-all duration-300 hover:bg-accent-dark active:scale-[0.98];
+  }
+  .input-field {
+    @apply w-full bg-cream border border-sand-200 px-4 py-3 text-charcoal-800 text-sm outline-none transition-all duration-200 focus:border-accent focus:bg-white;
+  }
+  .card {
+    @apply bg-white border border-sand-100 transition-all duration-500;
+  }
+  .section-label {
+    @apply text-xs tracking-[0.25em] uppercase text-accent font-medium;
+  }
+
+  /* Subtle Bangladeshi heritage border accent — Nakshi Kantha inspired stitch pattern */
+  .heritage-border-top {
+    border-top: 2px solid #8B6F47;
+    position: relative;
+  }
+  .heritage-border-top::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 120px;
+    height: 2px;
+    background: repeating-linear-gradient(
+      90deg,
+      transparent 0,
+      transparent 8px,
+      #B5532A 8px,
+      #B5532A 10px,
+      transparent 10px,
+      transparent 14px,
+      #8B6F47 14px,
+      #8B6F47 16px
+    );
+  }
+}
+
+/* Subtle Jamdani-inspired geometric pattern for section backgrounds */
+.jamdani-bg {
+  background-image:
+    repeating-linear-gradient(45deg, transparent 0, transparent 20px, rgba(139,111,71,0.03) 20px, rgba(139,111,71,0.03) 21px),
+    repeating-linear-gradient(-45deg, transparent 0, transparent 20px, rgba(139,111,71,0.03) 20px, rgba(139,111,71,0.03) 21px);
+}
+
+/* Nakshi Kantha stitch divider */
+.kantha-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #DCCCB4 20%, #8B6F47 50%, #DCCCB4 80%, transparent);
+}
+
+/* Scroll reveal */
+.reveal {
+  opacity: 0;
+  transform: translateY(32px);
+  transition: opacity 0.8s cubic-bezier(0.16,1,0.3,1), transform 0.8s cubic-bezier(0.16,1,0.3,1);
+}
+.reveal.in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #F5EFE6;
+}
+::-webkit-scrollbar-thumb {
+  background: #C9B291;
+  border-radius: 0;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #A67E4D;
+}
+
+/* Number animation */
+.num-animate {
+  transition: all 0.4s cubic-bezier(0.16,1,0.3,1);
+}
+
+/* Range slider */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 2px;
+  background: #DCCCB4;
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #242421;
+  cursor: pointer;
+  border: 3px solid #FBFAF6;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  transition: transform 0.2s;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #242421;
+  cursor: pointer;
+  border: 3px solid #FBFAF6;
+}
+
+/* Color picker */
+input[type="color"] {
+  -webkit-appearance: none;
+  appearance: none;
+  border: none;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+input[type="color"]::-webkit-color-swatch {
+  border: none;
+  border-radius: 0;
+}
