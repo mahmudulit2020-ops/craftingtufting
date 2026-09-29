@@ -1,83 +1,39 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Package, User, LogOut, MapPin, CreditCard, Heart, Clock, Ruler, ArrowRight } from 'lucide-react';
+import {
+  Package,
+  User,
+  LogOut,
+  Heart,
+  Ruler,
+  ArrowRight,
+  ExternalLink,
+} from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { supabase } from '@/lib/supabase';
-import { formatCurrency } from '@/lib/pricing';
+import { useCurrency } from '@/context/CurrencyContext';
+import { getLocalCustomOrders, getLocalStandardOrders } from '@/lib/api';
+import type { CustomOrder, Order } from '@/lib/types';
 
-interface CustomOrderRow {
-  id: string;
-  order_number: string;
-  rug_type: string;
-  shape: string;
-  area_sqft: number;
-  total_price: number;
-  advance_paid: number;
-  remaining: number;
-  production_status: string;
-  payment_status: string;
-  created_at: string;
-}
-
-interface OrderRow {
-  id: string;
-  order_number: string;
-  total: number;
-  advance_paid: number;
-  status: string;
-  payment_status: string;
-  created_at: string;
-}
-
-type Tab = 'orders' | 'custom' | 'profile' | 'addresses' | 'payments';
+type Tab = 'custom' | 'orders' | 'profile' | 'addresses' | 'payments';
 
 export default function AccountPage() {
-  const { user, loading, signOut } = useAuth();
+  const { user, signOut } = useAuth();
+  const { formatPrice } = useCurrency();
   const navigate = useNavigate();
 
-  const [tab, setTab] = useState<Tab>('orders');
-  const [customOrders, setCustomOrders] = useState<CustomOrderRow[]>([]);
-  const [orders, setOrders] = useState<OrderRow[]>([]);
-  const [dataLoading, setDataLoading] = useState(true);
+  const [tab, setTab] = useState<Tab>('custom');
+  const [customOrders, setCustomOrders] = useState<CustomOrder[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
 
   useEffect(() => {
-    if (!loading && !user) {
-      navigate('/signin');
-    }
-  }, [loading, user, navigate]);
+    const co = getLocalCustomOrders();
+    const st = getLocalStandardOrders();
+    setCustomOrders(co);
+    setOrders(st);
+  }, []);
 
-  useEffect(() => {
-    if (!user) return;
-    setDataLoading(true);
-    Promise.all([
-      supabase.from('custom_orders').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-      supabase.from('orders').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-    ]).then(([coRes, oRes]) => {
-      setCustomOrders((coRes.data as CustomOrderRow[]) ?? []);
-      setOrders((oRes.data as OrderRow[]) ?? []);
-    }).catch(() => {}).finally(() => setDataLoading(false));
-  }, [user]);
-
-  if (loading) {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-sand-200 border-t-accent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (!user) return null;
-
-  const fullName = (user.user_metadata?.full_name as string) || 'Customer';
-  const email = user.email || '';
-
-  const tabs: { id: Tab; label: string; icon: typeof Package }[] = [
-    { id: 'orders', label: 'My Orders', icon: Package },
-    { id: 'custom', label: 'Custom Designs', icon: Ruler },
-    { id: 'profile', label: 'Profile', icon: User },
-    { id: 'addresses', label: 'Addresses', icon: MapPin },
-    { id: 'payments', label: 'Payment History', icon: CreditCard },
-  ];
+  const fullName = (user?.user_metadata?.full_name as string) || 'Valued Client';
+  const email = user?.email || 'client@craftingtufting.com';
 
   const handleSignOut = async () => {
     await signOut();
@@ -87,248 +43,237 @@ export default function AccountPage() {
   return (
     <div className="bg-cream min-h-screen">
       {/* Header */}
-      <div className="bg-charcoal-900 text-cream py-12">
+      <div className="bg-charcoal-900 text-cream py-14">
         <div className="max-w-[1200px] mx-auto px-6 lg:px-10">
           <div className="kantha-divider w-16 mb-4 opacity-50" />
-          <p className="text-xs tracking-[0.25em] uppercase text-sand-300 mb-2">My Account</p>
-          <h1 className="text-3xl font-bold mb-1">Welcome, {fullName}</h1>
-          <p className="text-cream/50 text-sm">{email}</p>
+          <p className="text-xs tracking-[0.25em] uppercase text-sand-300 mb-2">
+            Client Atelier Portal
+          </p>
+          <h1 className="font-display text-3xl sm:text-4xl font-bold mb-1">
+            Welcome, {fullName}
+          </h1>
+          <p className="text-cream/60 text-xs">{email}</p>
         </div>
       </div>
 
       <div className="max-w-[1200px] mx-auto px-6 lg:px-10 py-10">
-        <div className="grid lg:grid-cols-[240px_1fr] gap-8 lg:gap-12">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Sidebar */}
-          <aside>
-            <nav className="space-y-1 mb-6">
-              {tabs.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => setTab(t.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-colors text-left ${
-                    tab === t.id
-                      ? 'bg-charcoal-800 text-cream'
-                      : 'text-charcoal-600 hover:bg-sand-50'
-                  }`}
-                >
-                  <t.icon size={18} /> {t.label}
-                </button>
-              ))}
-            </nav>
+          <div className="lg:col-span-3 bg-white border border-sand-200 p-2 shadow-sm space-y-1 text-xs">
+            <button
+              onClick={() => setTab('custom')}
+              className={`w-full text-left px-4 py-3 flex items-center justify-between transition-colors ${
+                tab === 'custom'
+                  ? 'bg-charcoal-900 text-cream font-semibold'
+                  : 'text-charcoal-700 hover:bg-sand-50'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Ruler size={15} />
+                <span>Custom Rugs</span>
+              </div>
+              <span className="font-mono text-[10px]">{customOrders.length}</span>
+            </button>
+
+            <button
+              onClick={() => setTab('orders')}
+              className={`w-full text-left px-4 py-3 flex items-center justify-between transition-colors ${
+                tab === 'orders'
+                  ? 'bg-charcoal-900 text-cream font-semibold'
+                  : 'text-charcoal-700 hover:bg-sand-50'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Package size={15} />
+                <span>Store Purchases</span>
+              </div>
+              <span className="font-mono text-[10px]">{orders.length}</span>
+            </button>
+
+            <Link
+              to="/wishlist"
+              className="w-full text-left px-4 py-3 flex items-center gap-2.5 text-charcoal-700 hover:bg-sand-50 transition-colors"
+            >
+              <Heart size={15} />
+              <span>Saved Wishlist</span>
+            </Link>
+
+            <button
+              onClick={() => setTab('profile')}
+              className={`w-full text-left px-4 py-3 flex items-center gap-2.5 transition-colors ${
+                tab === 'profile'
+                  ? 'bg-charcoal-900 text-cream font-semibold'
+                  : 'text-charcoal-700 hover:bg-sand-50'
+              }`}
+            >
+              <User size={15} />
+              <span>Profile & Delivery</span>
+            </button>
+
+            <div className="border-t border-sand-100 my-1" />
 
             <button
               onClick={handleSignOut}
-              className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors"
+              className="w-full text-left px-4 py-3 flex items-center gap-2.5 text-red-600 hover:bg-red-50 transition-colors"
             >
-              <LogOut size={18} /> Sign Out
+              <LogOut size={15} />
+              <span>Sign Out</span>
             </button>
+          </div>
 
-            <Link to="/custom-rug" className="btn-primary w-full mt-6 !py-3 !text-[11px]">
-              Create New Rug <ArrowRight size={14} />
-            </Link>
-          </aside>
-
-          {/* Content */}
-          <div>
-            {/* Orders tab */}
-            {tab === 'orders' && (
-              <div>
-                <h2 className="text-xl font-bold text-charcoal-900 mb-6">Ready-Made Orders</h2>
-                {dataLoading ? (
-                  <div className="w-8 h-8 border-2 border-sand-200 border-t-accent rounded-full animate-spin" />
-                ) : orders.length === 0 ? (
-                  <EmptyState icon={Package} title="No orders yet" desc="Your ready-made orders will appear here." cta="/shop" ctaLabel="Shop Now" />
-                ) : (
-                  <div className="space-y-4">
-                    {orders.map((o) => (
-                      <OrderCard key={o.id} order={o} />
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Custom Designs tab */}
+          {/* Main Content */}
+          <div className="lg:col-span-9 bg-white border border-sand-200 p-6 sm:p-8 shadow-sm">
             {tab === 'custom' && (
-              <div>
-                <h2 className="text-xl font-bold text-charcoal-900 mb-6">Custom Rug Orders</h2>
-                {dataLoading ? (
-                  <div className="w-8 h-8 border-2 border-sand-200 border-t-accent rounded-full animate-spin" />
-                ) : customOrders.length === 0 ? (
-                  <EmptyState icon={Ruler} title="No custom rugs yet" desc="Design your own custom rug — choose shape, size, colors, and get an instant price." cta="/custom-rug" ctaLabel="Start Custom Design" />
+              <div className="space-y-6">
+                <div className="flex justify-between items-center pb-4 border-b border-sand-200">
+                  <h2 className="font-display text-xl text-charcoal-900">
+                    Bespoke Custom Rug Commissions
+                  </h2>
+                  <Link
+                    to="/custom-rug"
+                    className="text-xs text-accent hover:underline font-semibold flex items-center gap-1"
+                  >
+                    + Create New Custom Rug <ArrowRight size={13} />
+                  </Link>
+                </div>
+
+                {customOrders.length === 0 ? (
+                  <p className="text-xs text-charcoal-500 py-10 text-center">
+                    No custom commissions created yet.
+                  </p>
                 ) : (
                   <div className="space-y-4">
-                    {customOrders.map((o) => (
-                      <CustomOrderCard key={o.id} order={o} />
+                    {customOrders.map((co) => (
+                      <div
+                        key={co.id}
+                        className="p-5 bg-sand-50 border border-sand-200 space-y-3 text-xs"
+                      >
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-2 border-b border-sand-200">
+                          <div>
+                            <span className="font-mono font-bold text-charcoal-900 text-sm">
+                              {co.order_number}
+                            </span>
+                            <span className="text-sand-300 mx-2">·</span>
+                            <span className="text-charcoal-600 uppercase tracking-wider text-[10px]">
+                              {co.design_name || 'Custom Artwork'} ({co.design_category})
+                            </span>
+                          </div>
+                          <span className="px-2.5 py-1 bg-sand-200 text-charcoal-900 font-semibold text-[10px] uppercase tracking-wider">
+                            Status: {co.production_status}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+                          <div>
+                            <span className="text-charcoal-400 block text-[10px] uppercase">Dimensions:</span>
+                            <span className="font-medium text-charcoal-800">
+                              {co.shape === 'circle' ? `⌀ ${co.diameter} ${co.unit}` : `${co.width} × ${co.length} ${co.unit}`} ({co.area_sqft} sq ft)
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-charcoal-400 block text-[10px] uppercase">Fiber & Pile:</span>
+                            <span className="font-medium text-charcoal-800">{co.yarn_type}</span>
+                          </div>
+                          <div>
+                            <span className="text-charcoal-400 block text-[10px] uppercase">50% Advance Paid:</span>
+                            <span className="font-bold text-emerald-700">{formatPrice(co.advance_paid)}</span>
+                          </div>
+                          <div>
+                            <span className="text-charcoal-400 block text-[10px] uppercase">Remaining Balance:</span>
+                            <span className="font-medium text-charcoal-700">{formatPrice(co.remaining)}</span>
+                          </div>
+                        </div>
+
+                        <div className="pt-3 border-t border-sand-200 flex justify-between items-center">
+                          <span className="text-[11px] text-charcoal-500">
+                            Est. Delivery: {co.estimated_delivery || '4–6 weeks'}
+                          </span>
+                          <Link
+                            to={`/track-order?code=${co.order_number}`}
+                            className="text-accent hover:underline font-semibold flex items-center gap-1 text-[11px]"
+                          >
+                            Open 8-Stage Timeline <ExternalLink size={12} />
+                          </Link>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 )}
               </div>
             )}
 
-            {/* Profile tab */}
-            {tab === 'profile' && (
-              <div className="max-w-lg">
-                <h2 className="text-xl font-bold text-charcoal-900 mb-6">Profile Information</h2>
-                <div className="bg-white border border-sand-100 p-6 lg:p-8 space-y-5">
-                  <div>
-                    <label className="block text-xs tracking-[0.15em] uppercase text-charcoal-500 mb-2">Full Name</label>
-                    <input type="text" defaultValue={fullName} className="input-field" readOnly />
-                  </div>
-                  <div>
-                    <label className="block text-xs tracking-[0.15em] uppercase text-charcoal-500 mb-2">Email</label>
-                    <input type="email" defaultValue={email} className="input-field" readOnly />
-                  </div>
-                  <p className="text-xs text-charcoal-400">Profile editing will be available in a future update.</p>
-                </div>
-              </div>
-            )}
-
-            {/* Addresses tab */}
-            {tab === 'addresses' && (
-              <div className="max-w-lg">
-                <h2 className="text-xl font-bold text-charcoal-900 mb-6">Saved Addresses</h2>
-                <EmptyState icon={MapPin} title="No saved addresses" desc="Your shipping addresses will be saved here after your first order." cta="/shop" ctaLabel="Shop Now" />
-              </div>
-            )}
-
-            {/* Payments tab */}
-            {tab === 'payments' && (
-              <div>
-                <h2 className="text-xl font-bold text-charcoal-900 mb-6">Payment History</h2>
-                {dataLoading ? (
-                  <div className="w-8 h-8 border-2 border-sand-200 border-t-accent rounded-full animate-spin" />
-                ) : customOrders.length + orders.length === 0 ? (
-                  <EmptyState icon={CreditCard} title="No payments yet" desc="Your payment history will appear here after you place an order." cta="/custom-rug" ctaLabel="Create Your Rug" />
+            {tab === 'orders' && (
+              <div className="space-y-6">
+                <h2 className="font-display text-xl text-charcoal-900 pb-4 border-b border-sand-200">
+                  Ready-Made Purchases
+                </h2>
+                {orders.length === 0 ? (
+                  <p className="text-xs text-charcoal-500 py-10 text-center">
+                    No ready-made orders placed yet.
+                  </p>
                 ) : (
-                  <div className="bg-white border border-sand-100 overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="bg-sand-50 text-left text-xs tracking-[0.1em] uppercase text-charcoal-500">
-                          <th className="p-4">Order</th>
-                          <th className="p-4">Type</th>
-                          <th className="p-4">Total</th>
-                          <th className="p-4">Advance Paid</th>
-                          <th className="p-4">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {customOrders.map((o) => (
-                          <tr key={o.id} className="border-t border-sand-50">
-                            <td className="p-4 font-mono text-xs">{o.order_number}</td>
-                            <td className="p-4 text-charcoal-600">Custom Rug</td>
-                            <td className="p-4 text-charcoal-800">{formatCurrency(Number(o.total_price))}</td>
-                            <td className="p-4 text-accent font-medium">{formatCurrency(Number(o.advance_paid))}</td>
-                            <td className="p-4"><span className="text-xs px-2 py-1 bg-sand-100 text-charcoal-600">{o.payment_status}</span></td>
-                          </tr>
-                        ))}
-                        {orders.map((o) => (
-                          <tr key={o.id} className="border-t border-sand-50">
-                            <td className="p-4 font-mono text-xs">{o.order_number}</td>
-                            <td className="p-4 text-charcoal-600">Ready-Made</td>
-                            <td className="p-4 text-charcoal-800">{formatCurrency(Number(o.total))}</td>
-                            <td className="p-4 text-accent font-medium">{formatCurrency(Number(o.advance_paid))}</td>
-                            <td className="p-4"><span className="text-xs px-2 py-1 bg-sand-100 text-charcoal-600">{o.payment_status}</span></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div className="divide-y divide-sand-100">
+                    {orders.map((o) => (
+                      <div key={o.id} className="py-4 flex justify-between items-center text-xs">
+                        <div>
+                          <p className="font-mono font-bold text-charcoal-900">{o.order_number}</p>
+                          <p className="text-charcoal-500">Items: {o.items.length} · Status: {o.status}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-charcoal-900 text-sm">{formatPrice(o.total)}</p>
+                          <Link
+                            to={`/track-order?code=${o.order_number}`}
+                            className="text-accent hover:underline text-[11px]"
+                          >
+                            Track Order
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
             )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
-function EmptyState({ icon: Icon, title, desc, cta, ctaLabel }: { icon: typeof Package; title: string; desc: string; cta: string; ctaLabel: string }) {
-  return (
-    <div className="bg-white border border-sand-100 p-12 text-center">
-      <Icon size={40} className="text-sand-300 mx-auto mb-4" />
-      <h3 className="text-lg font-semibold text-charcoal-800 mb-2">{title}</h3>
-      <p className="text-sm text-charcoal-500 mb-6 max-w-sm mx-auto">{desc}</p>
-      <Link to={cta} className="btn-primary">{ctaLabel} <ArrowRight size={16} /></Link>
-    </div>
-  );
-}
-
-function OrderCard({ order }: { order: OrderRow }) {
-  return (
-    <div className="bg-white border border-sand-100 p-5 lg:p-6">
-      <div className="flex flex-col sm:flex-row justify-between gap-4">
-        <div>
-          <p className="font-mono text-xs text-charcoal-500 mb-1">{order.order_number}</p>
-          <p className="text-sm text-charcoal-400">
-            {new Date(order.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-          </p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="text-right">
-            <p className="text-sm text-charcoal-500">Total</p>
-            <p className="font-semibold text-charcoal-900">{formatCurrency(Number(order.total))}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-sm text-charcoal-500">Advance</p>
-            <p className="font-medium text-accent">{formatCurrency(Number(order.advance_paid))}</p>
-          </div>
-        </div>
-      </div>
-      <div className="flex items-center gap-3 mt-4 pt-4 border-t border-sand-50">
-        <span className="text-xs px-2.5 py-1 bg-sand-100 text-charcoal-600">{order.status}</span>
-        <span className={`text-xs px-2.5 py-1 ${order.payment_status === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-sand-100 text-charcoal-600'}`}>{order.payment_status}</span>
-      </div>
-    </div>
-  );
-}
-
-function CustomOrderCard({ order }: { order: CustomOrderRow }) {
-  const statusColors: Record<string, string> = {
-    'Order Received': 'bg-sand-100 text-charcoal-600',
-    'Design Review': 'bg-yellow-100 text-yellow-700',
-    'Design Approved': 'bg-blue-100 text-blue-700',
-    'Production Started': 'bg-blue-100 text-blue-700',
-    'Quality Check': 'bg-purple-100 text-purple-700',
-    'Ready for Delivery': 'bg-teal-100 text-teal-700',
-    'Shipped': 'bg-indigo-100 text-indigo-700',
-    'Delivered': 'bg-green-100 text-green-700',
-  };
-
-  return (
-    <div className="bg-white border border-sand-100 p-5 lg:p-6">
-      <div className="flex flex-col sm:flex-row justify-between gap-4">
-        <div>
-          <p className="font-mono text-xs text-charcoal-500 mb-1">{order.order_number}</p>
-          <p className="text-sm text-charcoal-700 font-medium">
-            {order.rug_type === 'tufting' ? 'Tufting Rug' : 'Jute Handcraft'} — {order.shape}
-          </p>
-          <p className="text-sm text-charcoal-400">
-            {Number(order.area_sqft).toFixed(1)} sq ft · {new Date(order.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-          </p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="text-right">
-            <p className="text-sm text-charcoal-500">Total</p>
-            <p className="font-semibold text-charcoal-900">{formatCurrency(Number(order.total_price))}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-sm text-charcoal-500">Advance</p>
-            <p className="font-medium text-accent">{formatCurrency(Number(order.advance_paid))}</p>
+            {tab === 'profile' && (
+              <div className="space-y-5 text-xs">
+                <h2 className="font-display text-xl text-charcoal-900 pb-3 border-b border-sand-200">
+                  Client Profile & Preferences
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-charcoal-600 mb-1">Full Name</label>
+                    <input
+                      type="text"
+                      defaultValue={fullName}
+                      className="input-field !py-2.5 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-charcoal-600 mb-1">Email</label>
+                    <input
+                      type="email"
+                      defaultValue={email}
+                      className="input-field !py-2.5 text-xs"
+                      readOnly
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-charcoal-600 mb-1">Default International Delivery Address</label>
+                  <textarea
+                    rows={3}
+                    defaultValue="14 Rue de Rivoli, Paris, 75001 France"
+                    className="input-field !py-2.5 text-xs"
+                  />
+                </div>
+                <button type="button" className="btn-primary !py-2.5 !text-xs">
+                  Save Changes
+                </button>
+              </div>
+            )}
           </div>
         </div>
-      </div>
-      <div className="flex items-center gap-3 mt-4 pt-4 border-t border-sand-50 flex-wrap">
-        <span className={`text-xs px-2.5 py-1 ${statusColors[order.production_status] || 'bg-sand-100 text-charcoal-600'}`}>
-          {order.production_status}
-        </span>
-        <span className={`text-xs px-2.5 py-1 ${order.payment_status === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-sand-100 text-charcoal-600'}`}>
-          {order.payment_status}
-        </span>
-        <span className="text-xs text-charcoal-400 ml-auto flex items-center gap-1">
-          <Clock size={12} /> Remaining: {formatCurrency(Number(order.remaining))}
-        </span>
       </div>
     </div>
   );

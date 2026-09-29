@@ -1,22 +1,37 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, ShoppingBag, Zap, Check, Ruler, Truck, Sparkles } from 'lucide-react';
+import {
+  ArrowLeft,
+  ShoppingBag,
+  Zap,
+  Check,
+  Ruler,
+  Truck,
+  Heart,
+  ShieldCheck,
+  Leaf,
+} from 'lucide-react';
 import { fetchProductBySlug, fetchProductSizes } from '@/lib/api';
-import { formatCurrency } from '@/lib/pricing';
 import { useCart } from '@/context/CartContext';
+import { useWishlist } from '@/context/WishlistContext';
+import { useCurrency } from '@/context/CurrencyContext';
 import type { Product, ProductSize } from '@/lib/types';
 
 export default function ProductDetailPage() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { addItem } = useCart();
+  const { isWishlisted, toggleWishlist } = useWishlist();
+  const { formatPrice } = useCurrency();
 
   const [product, setProduct] = useState<Product | null>(null);
   const [sizes, setSizes] = useState<ProductSize[]>([]);
   const [selectedSize, setSelectedSize] = useState<ProductSize | null>(null);
   const [activeImage, setActiveImage] = useState(0);
+  const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [zoomed, setZoomed] = useState(false);
+  const [added, setAdded] = useState(false);
+  const [activeTab, setActiveTab] = useState<'details' | 'materials' | 'shipping' | 'care'>('details');
 
   useEffect(() => {
     if (!slug) return;
@@ -31,39 +46,8 @@ export default function ProductDetailPage() {
           });
         }
       })
-      .catch(() => {})
       .finally(() => setLoading(false));
   }, [slug]);
-
-  const handleAddToCart = () => {
-    if (!product || !selectedSize) return;
-    addItem({
-      id: `${product.id}-${selectedSize.id}`,
-      type: 'product',
-      productId: product.id,
-      name: product.name,
-      image: product.image_url,
-      size: selectedSize.label,
-      quantity: 1,
-      price: selectedSize.price,
-    });
-    navigate('/cart');
-  };
-
-  const handleBuyNow = () => {
-    if (!product || !selectedSize) return;
-    addItem({
-      id: `${product.id}-${selectedSize.id}`,
-      type: 'product',
-      productId: product.id,
-      name: product.name,
-      image: product.image_url,
-      size: selectedSize.label,
-      quantity: 1,
-      price: selectedSize.price,
-    });
-    navigate('/checkout');
-  };
 
   if (loading) {
     return (
@@ -76,51 +60,94 @@ export default function ProductDetailPage() {
   if (!product) {
     return (
       <div className="max-w-2xl mx-auto px-6 py-32 text-center">
-        <h1 className="font-display text-3xl text-charcoal-900 mb-4">Product Not Found</h1>
-        <Link to="/shop" className="btn-primary">Back to Shop</Link>
+        <h1 className="font-display text-3xl text-charcoal-900 mb-4">Artisan Rug Not Found</h1>
+        <p className="text-xs text-charcoal-500 mb-6">The requested piece may have been archived or sold out.</p>
+        <Link to="/shop" className="btn-primary">Browse All Collections</Link>
       </div>
     );
   }
 
+  const currentPrice = (selectedSize ? selectedSize.price : product.base_price) * quantity;
+  const isFav = isWishlisted(product.id);
   const gallery = product.gallery?.length ? product.gallery : [product.image_url];
+
+  const handleAddToCart = () => {
+    if (!selectedSize) return;
+    addItem({
+      id: `${product.id}-${selectedSize.id}`,
+      type: 'product',
+      productId: product.id,
+      name: product.name,
+      image: product.image_url,
+      size: selectedSize.label,
+      quantity,
+      price: selectedSize.price,
+    });
+    setAdded(true);
+    setTimeout(() => setAdded(false), 2000);
+  };
+
+  const handleBuyNow = () => {
+    if (!selectedSize) return;
+    addItem({
+      id: `${product.id}-${selectedSize.id}`,
+      type: 'product',
+      productId: product.id,
+      name: product.name,
+      image: product.image_url,
+      size: selectedSize.label,
+      quantity,
+      price: selectedSize.price,
+    });
+    navigate('/checkout');
+  };
 
   return (
     <div className="bg-cream min-h-screen">
       {/* Breadcrumb */}
       <div className="max-w-[1440px] mx-auto px-6 lg:px-10 py-6">
-        <Link to="/shop" className="inline-flex items-center gap-2 text-xs tracking-[0.15em] uppercase text-charcoal-500 hover:text-accent transition-colors">
-          <ArrowLeft size={14} /> Back to Shop
+        <Link
+          to="/shop"
+          className="inline-flex items-center gap-2 text-xs tracking-[0.15em] uppercase text-charcoal-500 hover:text-accent transition-colors"
+        >
+          <ArrowLeft size={14} /> Back to Catalog
         </Link>
       </div>
 
-      <div className="max-w-[1440px] mx-auto px-6 lg:px-10 pb-20">
-        <div className="grid lg:grid-cols-2 gap-8 lg:gap-16">
-          {/* Gallery */}
-          <div>
-            <div
-              className="relative overflow-hidden bg-sand-50 aspect-square cursor-zoom-in mb-4"
-              onMouseEnter={() => setZoomed(true)}
-              onMouseLeave={() => setZoomed(false)}
-            >
+      <div className="max-w-[1440px] mx-auto px-6 lg:px-10 pb-24">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16 items-start">
+          {/* Left Column: Image Gallery */}
+          <div className="lg:col-span-7 space-y-4">
+            <div className="aspect-[4/5] bg-sand-100 overflow-hidden relative border border-sand-200">
               <img
-                src={gallery[activeImage]}
+                src={gallery[activeImage] || product.image_url}
                 alt={product.name}
-                className={`w-full h-full object-cover transition-transform duration-700 ${zoomed ? 'scale-150' : 'scale-100'}`}
+                className="w-full h-full object-cover transition-all duration-700"
               />
-              {product.stock_status === 'Made to Order' && (
-                <span className="absolute top-4 left-4 bg-cream/90 backdrop-blur-sm text-charcoal-800 text-[10px] tracking-[0.2em] uppercase px-3 py-1.5">
-                  Made to Order
-                </span>
-              )}
+              <button
+                onClick={() => toggleWishlist(product)}
+                className={`absolute top-4 right-4 p-3 rounded-full transition-all duration-300 shadow-md ${
+                  isFav
+                    ? 'bg-terracotta text-cream'
+                    : 'bg-white/80 backdrop-blur-sm text-charcoal-800 hover:bg-white'
+                }`}
+                aria-label="Wishlist"
+              >
+                <Heart size={18} fill={isFav ? 'currentColor' : 'none'} />
+              </button>
             </div>
 
             {gallery.length > 1 && (
               <div className="flex gap-3">
-                {gallery.map((img, i) => (
+                {gallery.map((img, idx) => (
                   <button
-                    key={i}
-                    onClick={() => setActiveImage(i)}
-                    className={`w-20 h-20 overflow-hidden bg-sand-50 transition-all ${activeImage === i ? 'ring-2 ring-accent' : 'ring-1 ring-sand-100 hover:ring-sand-300'}`}
+                    key={idx}
+                    onClick={() => setActiveImage(idx)}
+                    className={`w-20 h-20 border transition-all overflow-hidden ${
+                      activeImage === idx
+                        ? 'border-charcoal-900 ring-2 ring-charcoal-900/10'
+                        : 'border-sand-200 opacity-70 hover:opacity-100'
+                    }`}
                   >
                     <img src={img} alt="" className="w-full h-full object-cover" />
                   </button>
@@ -129,97 +156,185 @@ export default function ProductDetailPage() {
             )}
           </div>
 
-          {/* Details */}
-          <div className="lg:py-4">
-            <p className="text-xs tracking-[0.2em] uppercase text-accent mb-3">{product.category}</p>
-            <h1 className="font-display text-4xl lg:text-5xl text-charcoal-900 mb-4">{product.name}</h1>
-            <p className="text-sm text-charcoal-500 mb-6">{product.material}</p>
+          {/* Right Column: Specifications & Checkout Action */}
+          <div className="lg:col-span-5 space-y-6">
+            <div>
+              <div className="flex items-center gap-2 text-xs tracking-[0.2em] uppercase text-accent font-semibold mb-2">
+                <span>{product.category}</span>
+                {product.subCategory && (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span>{product.subCategory}</span>
+                  </>
+                )}
+              </div>
 
-            <div className="flex items-baseline gap-4 mb-8">
-              {selectedSize && (
-                <span className="font-display text-3xl text-charcoal-900">
-                  {formatCurrency(selectedSize.price)}
+              <h1 className="font-display text-3xl sm:text-4xl text-charcoal-900 font-bold mb-3">
+                {product.name}
+              </h1>
+
+              <div className="flex items-baseline gap-4">
+                <span className="font-display text-3xl font-bold text-charcoal-900">
+                  {formatPrice(currentPrice)}
                 </span>
-              )}
-              <span className={`text-sm ${product.stock_status === 'In Stock' ? 'text-green-700' : 'text-accent'}`}>
-                ● {product.stock_status}
-              </span>
+                <span className="text-xs tracking-wider uppercase text-emerald-700 font-medium">
+                  {product.stock_status}
+                </span>
+              </div>
             </div>
 
-            <p className="text-charcoal-600 leading-relaxed mb-8">{product.description}</p>
+            <p className="text-xs text-charcoal-600 leading-relaxed pt-3 border-t border-sand-200">
+              {product.description}
+            </p>
 
-            {/* Size selector */}
+            {/* Size Dimension Picker */}
             {sizes.length > 0 && (
-              <div className="mb-8">
-                <label className="block text-xs tracking-[0.15em] uppercase text-charcoal-500 mb-4">Select Size</label>
-                <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                  {sizes.map((size) => (
+              <div className="pt-4 border-t border-sand-200">
+                <div className="flex justify-between items-baseline mb-2.5">
+                  <label className="text-xs tracking-[0.15em] uppercase text-charcoal-700 font-semibold">
+                    Select Dimensions
+                  </label>
+                  <Link
+                    to="/custom-rug"
+                    className="text-xs text-accent hover:underline flex items-center gap-1 font-medium"
+                  >
+                    <Ruler size={13} /> Need a custom size?
+                  </Link>
+                </div>
+
+                <div className="space-y-2">
+                  {sizes.map((s) => (
                     <button
-                      key={size.id}
-                      onClick={() => setSelectedSize(size)}
-                      className={`p-3 text-xs text-center transition-all ${selectedSize?.id === size.id ? 'bg-charcoal-800 text-cream' : 'bg-white border border-sand-200 text-charcoal-700 hover:border-sand-400'}`}
+                      key={s.id}
+                      onClick={() => setSelectedSize(s)}
+                      className={`w-full p-3.5 text-xs text-left border flex items-center justify-between transition-all ${
+                        selectedSize?.id === s.id
+                          ? 'border-charcoal-900 bg-sand-100 ring-1 ring-charcoal-900 font-semibold'
+                          : 'border-sand-200 bg-white hover:border-sand-400'
+                      }`}
                     >
-                      {size.label}
-                      <span className="block text-[10px] mt-1 opacity-60">{formatCurrency(size.price)}</span>
+                      <span className="text-charcoal-900">{s.label}</span>
+                      <span className="font-display text-sm text-charcoal-900">
+                        {formatPrice(s.price)}
+                      </span>
                     </button>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Actions */}
-            <div className="flex flex-col sm:flex-row gap-3 mb-8">
-              <button onClick={handleAddToCart} className="btn-secondary flex-1">
-                <ShoppingBag size={16} /> Add to Cart
-              </button>
-              <button onClick={handleBuyNow} className="btn-primary flex-1">
-                <Zap size={16} /> Buy Now
-              </button>
-            </div>
-
-            {/* Custom CTA */}
-            <div className="bg-sand-50 p-6 mb-8 border-l-4 border-accent">
-              <p className="text-sm text-charcoal-700 mb-3">Need a different size or design?</p>
-              <Link to="/custom-rug" className="inline-flex items-center gap-2 text-sm tracking-[0.15em] uppercase text-accent hover:gap-4 transition-all">
-                Create Custom Version <Sparkles size={16} />
-              </Link>
-            </div>
-
-            {/* Info sections */}
-            <div className="space-y-6 border-t border-sand-100 pt-8">
-              {product.care_info && (
-                <div>
-                  <h3 className="text-xs tracking-[0.15em] uppercase text-charcoal-500 mb-2">Care Instructions</h3>
-                  <p className="text-sm text-charcoal-700 leading-relaxed">{product.care_info}</p>
-                </div>
-              )}
-              {product.production_info && (
-                <div>
-                  <h3 className="text-xs tracking-[0.15em] uppercase text-charcoal-500 mb-2">Production</h3>
-                  <p className="text-sm text-charcoal-700 leading-relaxed">{product.production_info}</p>
-                </div>
-              )}
-              {product.shipping_info && (
-                <div>
-                  <h3 className="text-xs tracking-[0.15em] uppercase text-charcoal-500 mb-2">Shipping</h3>
-                  <p className="text-sm text-charcoal-700 leading-relaxed">{product.shipping_info}</p>
-                </div>
-              )}
-            </div>
-
-            {/* Trust badges */}
-            <div className="grid grid-cols-3 gap-4 mt-8 pt-8 border-t border-sand-100">
-              <div className="text-center">
-                <Check size={20} className="text-accent mx-auto mb-2" />
-                <p className="text-[10px] tracking-[0.1em] uppercase text-charcoal-500">Quality Checked</p>
+            {/* Quantity Selector */}
+            <div className="flex items-center gap-4 pt-2">
+              <span className="text-xs tracking-[0.15em] uppercase text-charcoal-600 font-medium">
+                Quantity:
+              </span>
+              <div className="flex items-center border border-sand-300 bg-white">
+                <button
+                  type="button"
+                  onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                  className="px-3 py-2 text-charcoal-600 hover:text-charcoal-900 transition-colors"
+                >
+                  -
+                </button>
+                <span className="px-4 py-2 text-xs font-semibold text-charcoal-900">
+                  {quantity}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setQuantity((q) => q + 1)}
+                  className="px-3 py-2 text-charcoal-600 hover:text-charcoal-900 transition-colors"
+                >
+                  +
+                </button>
               </div>
-              <div className="text-center">
-                <Ruler size={20} className="text-accent mx-auto mb-2" />
-                <p className="text-[10px] tracking-[0.1em] uppercase text-charcoal-500">Custom Sizes</p>
+            </div>
+
+            {/* Actions: Add to Cart & Buy Now */}
+            <div className="space-y-3 pt-4">
+              <button
+                onClick={handleAddToCart}
+                className="w-full btn-primary !py-4 flex items-center justify-center gap-2"
+              >
+                {added ? (
+                  <>
+                    <Check size={18} /> Added to Bag
+                  </>
+                ) : (
+                  <>
+                    <ShoppingBag size={18} /> Add to Cart — {formatPrice(currentPrice)}
+                  </>
+                )}
+              </button>
+
+              <button
+                onClick={handleBuyNow}
+                className="w-full btn-accent !py-4 flex items-center justify-center gap-2"
+              >
+                <Zap size={16} /> Instant Checkout
+              </button>
+            </div>
+
+            {/* Trust and Artisan Guarantee Badges */}
+            <div className="pt-6 border-t border-sand-200 space-y-2.5 text-xs text-charcoal-600">
+              <div className="flex items-center gap-2.5">
+                <ShieldCheck size={16} className="text-accent" />
+                <span>Handcrafted in Bangladesh by master weavers</span>
               </div>
-              <div className="text-center">
-                <Truck size={20} className="text-accent mx-auto mb-2" />
-                <p className="text-[10px] tracking-[0.1em] uppercase text-charcoal-500">Free Shipping</p>
+              <div className="flex items-center gap-2.5">
+                <Truck size={16} className="text-accent" />
+                <span>Insured worldwide express air shipping with live tracking</span>
+              </div>
+              <div className="flex items-center gap-2.5">
+                <Leaf size={16} className="text-accent" />
+                <span>Zero synthetic volatile adhesives · 100% natural backing</span>
+              </div>
+            </div>
+
+            {/* Tabbed Info */}
+            <div className="pt-6 border-t border-sand-200">
+              <div className="flex border-b border-sand-200 gap-6 text-xs uppercase tracking-wider font-semibold">
+                {(['details', 'materials', 'shipping', 'care'] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`pb-2.5 transition-colors border-b-2 -mb-px ${
+                      activeTab === tab
+                        ? 'border-accent text-accent font-bold'
+                        : 'border-transparent text-charcoal-500 hover:text-charcoal-900'
+                    }`}
+                  >
+                    {tab === 'details'
+                      ? 'Story'
+                      : tab === 'materials'
+                      ? 'Fibers'
+                      : tab === 'shipping'
+                      ? 'Delivery'
+                      : 'Care'}
+                  </button>
+                ))}
+              </div>
+
+              <div className="pt-4 text-xs text-charcoal-600 leading-relaxed">
+                {activeTab === 'details' && (
+                  <p>{product.description}</p>
+                )}
+                {activeTab === 'materials' && (
+                  <div>
+                    <p className="font-semibold text-charcoal-800 mb-1">Primary Fiber:</p>
+                    <p className="mb-2">{product.material}</p>
+                    <p className="font-semibold text-charcoal-800 mb-1">Production Technique:</p>
+                    <p>{product.production_info}</p>
+                  </div>
+                )}
+                {activeTab === 'shipping' && (
+                  <div>
+                    <p className="mb-2">{product.shipping_info}</p>
+                    <p>Orders are dispatched in moisture-sealed tubes with courier tracking numbers.</p>
+                  </div>
+                )}
+                {activeTab === 'care' && (
+                  <p>{product.care_info}</p>
+                )}
               </div>
             </div>
           </div>

@@ -1,0 +1,283 @@
+// Prisma Schema for Artisanal Tufted Rugs & Bangladeshi Jute Crafts Platform
+// Database: PostgreSQL with full multi-role RBAC, custom rug engine, and 50% split-payment support
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  CUSTOMER
+  ADMIN
+  SUPER_ADMIN
+  ATELIER_WEAVER
+}
+
+enum RugType {
+  TUFTING
+  JUTE
+}
+
+enum RugShape {
+  RECTANGLE
+  SQUARE
+  CIRCLE
+  OVAL
+  CUSTOM_DIE_CUT
+}
+
+enum UnitOfMeasure {
+  FT
+  IN
+  CM
+  M
+}
+
+enum PaymentStatus {
+  PENDING
+  ADVANCE_PAID_50
+  FULLY_PAID
+  REFUNDED
+  FAILED
+}
+
+enum ProductionStatus {
+  ORDER_CREATED
+  ADVANCE_PAYMENT_RECEIVED
+  DESIGN_REVIEW
+  IN_PRODUCTION
+  QUALITY_AND_SHEARING
+  READY_TO_SHIP
+  SHIPPED
+  DELIVERED
+}
+
+model User {
+  id            String          @id @default(cuid())
+  email         String          @unique
+  fullName      String?
+  phone         String?
+  avatarUrl     String?
+  role          Role            @default(CUSTOMER)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  orders        Order[]
+  customOrders  CustomRugOrder[]
+  addresses     Address[]
+  reviews       Review[]
+}
+
+model Address {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label       String   @default("Home")
+  fullName    String
+  street      String
+  city        String
+  state       String?
+  postalCode  String
+  country     String
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  slug        String    @unique
+  description String?
+  rugType     RugType
+  products    Product[]
+  createdAt   DateTime  @default(now())
+}
+
+model Product {
+  id             String           @id @default(cuid())
+  name           String
+  slug           String           @unique
+  categoryId     String
+  category       Category         @relation(fields: [categoryId], references: [id])
+  material       String
+  description    String
+  careInfo       String?
+  productionInfo String?
+  shippingInfo   String?
+  basePriceUSD   Decimal          @db.Decimal(10, 2)
+  isFeatured     Boolean          @default(false)
+  isBestSeller   Boolean          @default(false)
+  isNewArrival   Boolean          @default(false)
+  stockStatus    String           @default("In Stock")
+  images         ProductImage[]
+  sizes          ProductVariant[]
+  reviews        Review[]
+  orderItems     OrderItem[]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+}
+
+model ProductImage {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  isPrimary Boolean  @default(false)
+  sortOrder Int      @default(0)
+}
+
+model ProductVariant {
+  id          String   @id @default(cuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  label       String   // e.g., "4 × 6 ft"
+  widthFt     Decimal  @db.Decimal(6, 2)
+  lengthFt    Decimal  @db.Decimal(6, 2)
+  priceUSD    Decimal  @db.Decimal(10, 2)
+  sku         String?  @unique
+}
+
+model CustomRugOrder {
+  id                  String             @id @default(cuid())
+  orderNumber         String             @unique
+  userId              String?
+  user                User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  customerName        String
+  customerEmail       String
+  customerPhone       String
+  country             String
+  deliveryAddress     String?
+  city                String?
+  postalCode          String?
+  
+  // Custom specifications
+  rugType             RugType            @default(TUFTING)
+  shape               RugShape           @default(RECTANGLE)
+  width               Decimal?           @db.Decimal(8, 2)
+  length              Decimal?           @db.Decimal(8, 2)
+  diameter            Decimal?           @db.Decimal(8, 2)
+  unit                UnitOfMeasure      @default(FT)
+  areaSqFt            Decimal            @db.Decimal(8, 2)
+  areaSqM             Decimal            @db.Decimal(8, 2)
+  
+  designCategory      String
+  designTitle         String
+  uploadedArtworkUrl  String?
+  uploadedFileName    String?
+  uploadedFileSize    Int?
+  
+  yarnMaterial        String             // e.g. "100% New Zealand Wool"
+  pileDepth           String             // e.g. "3D Sculpted Carved Relief"
+  backingType         String             // e.g. "Non-slip Cotton Twill"
+  finishingType       String             // e.g. "Hand-sheared Beveled Edge"
+  selectedAddonCodes  String[]
+  paletteColors       Json?
+  
+  // Financial & 50% split payment structure
+  totalPriceUSD       Decimal            @db.Decimal(10, 2)
+  advancePaidUSD      Decimal            @db.Decimal(10, 2)
+  remainingBalanceUSD Decimal            @db.Decimal(10, 2)
+  paymentStatus       PaymentStatus      @default(ADVANCE_PAID_50)
+  productionStatus    ProductionStatus   @default(ADVANCE_PAYMENT_RECEIVED)
+  
+  trackingNumber      String?
+  estimatedDelivery   String?
+  clientNotes         String?
+  
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  statusHistory       OrderStatusHistory[]
+  payments            Payment[]
+}
+
+model Order {
+  id                  String             @id @default(cuid())
+  orderNumber         String             @unique
+  userId              String?
+  user                User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  customerName        String
+  customerEmail       String
+  customerPhone       String
+  country             String
+  address             String
+  city                String
+  postalCode          String
+  
+  totalAmountUSD      Decimal            @db.Decimal(10, 2)
+  advancePaidUSD      Decimal            @db.Decimal(10, 2)
+  remainingBalanceUSD Decimal            @db.Decimal(10, 2)
+  isSplitPayment      Boolean            @default(false)
+  
+  paymentStatus       PaymentStatus      @default(PENDING)
+  productionStatus    ProductionStatus   @default(ORDER_CREATED)
+  trackingNumber      String?
+  
+  items               OrderItem[]
+  payments            Payment[]
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+}
+
+model OrderItem {
+  id          String   @id @default(cuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String?
+  product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  name        String
+  sizeLabel   String?
+  quantity    Int      @default(1)
+  unitPriceUSD Decimal @db.Decimal(10, 2)
+  totalPriceUSD Decimal @db.Decimal(10, 2)
+}
+
+model Payment {
+  id                String          @id @default(cuid())
+  orderId           String?
+  order             Order?          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  customRugOrderId  String?
+  customRugOrder    CustomRugOrder? @relation(fields: [customRugOrderId], references: [id], onDelete: Cascade)
+  amountUSD         Decimal         @db.Decimal(10, 2)
+  currencyCode      String          @default("USD")
+  gateway           String          // STRIPE, PAYPAL, SWIFT_WIRE, BKASH
+  gatewayPaymentId  String?
+  paymentPhase      String          // "ADVANCE_50_PERCENT" or "FINAL_BALANCE_50_PERCENT"
+  status            PaymentStatus
+  createdAt         DateTime        @default(now())
+}
+
+model OrderStatusHistory {
+  id                String          @id @default(cuid())
+  customRugOrderId  String
+  customRugOrder    CustomRugOrder  @relation(fields: [customRugOrderId], references: [id], onDelete: Cascade)
+  stage             ProductionStatus
+  note              String?
+  timestamp         DateTime        @default(now())
+}
+
+model PricingConfig {
+  id              String   @id @default(cuid())
+  rugType         RugType  @unique
+  label           String
+  basePricePerSqFt Decimal @db.Decimal(8, 2)
+  minOrderPrice   Decimal  @db.Decimal(8, 2)
+  shapeSurcharge  Decimal  @db.Decimal(8, 2)
+  updatedAt       DateTime @updatedAt
+}
+
+model Review {
+  id          String   @id @default(cuid())
+  productId   String?
+  product     Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  authorName  String
+  location    String?
+  rating      Int      @default(5)
+  title       String?
+  body        String
+  createdAt   DateTime @default(now())
+}
